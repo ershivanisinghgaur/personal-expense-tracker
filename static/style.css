@@ -1,0 +1,94 @@
+@import url("https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@500;600;700;800&display=swap");
+
+:root {
+    font-family: "DM Sans", sans-serif;
+    color: #17231f;
+    background: #f4f6f5;
+    font-synthesis: none;
+}
+
+* { box-sizing: border-box; }
+body { margin: 0; }
+a { color: #147d63; text-decoration: none; font-weight: 600; }
+a:hover { color: #0c5d49; }
+.site-header {
+    min-height: 76px;
+    padding: 0 max(7vw, 24px);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 24px;
+    background: #fff;
+    border-bottom: 1px solid #e6ebe8;
+}
+.site-title { color: #17231f; font: 800 18px "Manrope", sans-serif; letter-spacing: -.5px; }
+nav { display: flex; align-items: center; gap: 8px; }
+nav a { color: #627068; font-size: 14px; padding: 10px 14px; border-radius: 8px; transition: background .15s, color .15s; }
+nav a:hover, nav a.active { color: #12664f; background: #eaf5ef; }
+.container { width: min(880px, 88vw); margin: 48px auto; }
+.page-heading, .section-heading { display: flex; align-items: center; justify-content: space-between; gap: 20px; }
+.page-heading { margin-bottom: 28px; }
+.eyebrow { color: #148268; font-size: 11px; font-weight: 700; letter-spacing: 1.5px; }
+h1, h2 { font-family: "Manrope", sans-serif; letter-spacing: -1px; }
+h1 { margin: 4px 0; font-size: clamp(30px, 5vw, 42px); }
+h2 { margin: 0; font-size: 19px; }
+.muted { color: #718078; }
+.button {
+    border: 0;
+    border-radius: 8px;
+    padding: 13px 19px;
+    display: inline-block;
+    color: #fff;
+    background: #147d63;
+    font: 700 14px "DM Sans", sans-serif;
+    cursor: pointer;
+    white-space: nowrap;
+    box-shadow: 0 3px 8px #147d6326;
+    transition: background .15s, transform .15s, box-shadow .15s;
+}
+.button:hover { color: #fff; background: #0c5d49; transform: translateY(-1px); box-shadow: 0 5px 12px #147d6333; }
+.summary-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; margin-bottom: 18px; }
+.card { background: #fff; border: 1px solid #e8ede9; border-radius: 12px; padding: 24px; margin-bottom: 18px; box-shadow: 0 5px 18px #253d3010; }
+.card p { margin-top: 0; }
+.large-number { margin: 8px 0 0; font: 800 34px "Manrope", sans-serif; }
+.total-card { background: linear-gradient(135deg, #e8f5ef, #f3faf6); border-color: #d7ecdf; }
+.category-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-top: 20px; }
+.category-item { padding: 15px; border-radius: 10px; background: #f5f7f4; display: grid; gap: 8px; }
+.category-item span { color: #718078; font-size: 13px; }
+.expense-list { list-style: none; margin: 14px 0 0; padding: 0; }
+.expense-list li { display: flex; justify-content: space-between; padding: 14px 0; border-top: 1px solid #edf0ed; }
+.section-heading { margin-bottom: 8px; }
+.expense-form { max-width: 520px; display: grid; gap: 11px; }
+.expense-form label { margin-top: 6px; font-size: 14px; font-weight: 700; }
+.expense-form input, .expense-form select { width: 100%; padding: 12px; border: 1px solid #dce4de; border-radius: 8px; background: #fff; color: inherit; font: inherit; }
+.expense-form .button { margin-top: 12px; }
+.notice { padding: 12px 16px; border-radius: 8px; }
+.notice.success { color: #126044; background: #e1f4e9; }
+.notice.error { color: #9c3025; background: #fde9e5; }
+.table-wrap { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; text-align: left; }
+th, td { padding: 15px 10px; border-bottom: 1px solid #edf0ed; }
+thead th, tfoot th { color: #53635b; font-size: 13px; }
+.amount { text-align: right; }
+.row-action { text-align: right; }
+.row-action form { margin: 0; }
+.delete-button {
+    border: 1px solid #f0d2cd;
+    border-radius: 7px;
+    padding: 7px 10px;
+    color: #a23b30;
+    background: #fff8f6;
+    font: 600 13px "DM Sans", sans-serif;
+    cursor: pointer;
+}
+.delete-button:hover { background: #fde9e5; }
+tfoot th { border-bottom: 0; padding-top: 19px; }
+@media (max-width: 600px) {
+    .site-header { padding: 14px 6vw; flex-direction: column; align-items: stretch; gap: 10px; }
+    nav { width: 100%; gap: 4px; justify-content: space-between; }
+    nav a { padding: 9px 10px; font-size: 13px; }
+    .container { margin: 32px auto; }
+    .page-heading { align-items: flex-start; flex-direction: column; }
+    .summary-grid { grid-template-columns: 1fr; gap: 0; }
+    .category-grid { grid-template-columns: repeat(2, 1fr); }
+}

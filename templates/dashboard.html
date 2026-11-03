@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+{% block title %}Dashboard | Expense Tracker{% endblock %}
+{% block content %}
+    <section class="page-heading">
+        <div>
+            <p class="eyebrow">YOUR MONEY, AT A GLANCE</p>
+            <h1>Dashboard</h1>
+            <p class="muted">A clear view of your recorded spending.</p>
+        </div>
+        <a class="button" href="{{ url_for('add_expense') }}">+ Add expense</a>
+    </section>
+
+    <section class="summary-grid" aria-label="Spending summary">
+        <article class="card total-card">
+            <p class="muted">Total spent</p>
+            <p class="large-number">{{ "%.2f"|format(total) }}</p>
+        </article>
+        <article class="card">
+            <p class="muted">Expenses recorded</p>
+            <p class="large-number">{{ expense_count }}</p>
+        </article>
+    </section>
+
+    <section class="card">
+        <h2>By category</h2>
+        <div class="category-grid">
+            {% for category, amount in totals_by_category.items() %}
+                <div class="category-item">
+                    <span>{{ category|capitalize }}</span>
+                    <strong>{{ "%.2f"|format(amount) }}</strong>
+                </div>
+            {% endfor %}
+        </div>
+    </section>
+
+    <section class="card">
+        <div class="section-heading">
+            <h2>Recent expenses</h2>
+            <a href="{{ url_for('history') }}">View all</a>
+        </div>
+        {% if recent_expenses %}
+            <ul class="expense-list">
+                {% for expense in recent_expenses %}
+                    <li><span>{{ expense.category|capitalize }}</span><strong>{{ "%.2f"|format(expense.amount) }}</strong></li>
+                {% endfor %}
+            </ul>
+        {% else %}
+            <p class="muted">No expenses yet. Add your first expense to get started.</p>
+        {% endif %}
+    </section>
+{% endblock %}

@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% block title %}Expense history | Expense Tracker{% endblock %}
+{% block content %}
+    <section class="page-heading">
+        <div>
+            <p class="eyebrow">ALL YOUR RECORDS</p>
+            <h1>Expense history</h1>
+            <p class="muted">Your expenses, newest first.</p>
+        </div>
+        <a class="button" href="{{ url_for('add_expense') }}">+ Add expense</a>
+    </section>
+    <section class="card">
+        {% if expenses %}
+            <div class="table-wrap">
+                <table>
+                    <thead><tr><th>#</th><th>Category</th><th class="amount">Amount</th><th></th></tr></thead>
+                    <tbody>
+                        {% for index, expense in expenses %}
+                            <tr>
+                                <td class="muted">{{ loop.index }}</td>
+                                <td>{{ expense.category|capitalize }}</td>
+                                <td class="amount">{{ "%.2f"|format(expense.amount) }}</td>
+                                <td class="row-action">
+                                    <form method="post" action="{{ url_for('delete_expense', index=index) }}"
+                                          onsubmit="return confirm('Delete this expense? This cannot be undone.');">
+                                        <button class="delete-button" type="submit">Delete</button>
+                                    </form>
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                    <tfoot><tr><th colspan="2">Total</th><th class="amount">{{ "%.2f"|format(total) }}</th><th></th></tr></tfoot>
+                </table>
+            </div>
+        {% else %}
+            <p class="muted">No expenses recorded yet.</p>
+        {% endif %}
+    </section>
+{% endblock %}
