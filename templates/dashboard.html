@@ -12,13 +12,42 @@
 
     <section class="summary-grid" aria-label="Spending summary">
         <article class="card total-card">
-            <p class="muted">Total spent</p>
+            <p class="muted">Spent in {{ current_month }}</p>
             <p class="large-number">{{ "%.2f"|format(total) }}</p>
         </article>
         <article class="card">
-            <p class="muted">Expenses recorded</p>
+            <p class="muted">Expenses this month</p>
             <p class="large-number">{{ expense_count }}</p>
         </article>
+    </section>
+
+    <section class="card budget-card">
+        <div class="section-heading">
+            <div>
+                <h2>Monthly budget</h2>
+                {% if monthly_budget > 0 %}
+                    <p class="muted budget-status {% if remaining_budget < 0 %}over-budget{% endif %}">
+                        {% if remaining_budget < 0 %}
+                            Over budget by {{ "%.2f"|format(-remaining_budget) }}
+                        {% else %}
+                            {{ "%.2f"|format(remaining_budget) }} remaining
+                        {% endif %}
+                    </p>
+                {% else %}
+                    <p class="muted budget-status">Set a budget to track your monthly spending.</p>
+                {% endif %}
+            </div>
+            {% if monthly_budget > 0 %}
+                <strong class="budget-amount">{{ "%.2f"|format(monthly_budget) }}</strong>
+            {% endif %}
+        </div>
+        <form class="budget-form" method="post" action="{{ url_for('update_budget') }}">
+            <label for="monthly-budget">Monthly limit</label>
+            <input id="monthly-budget" name="monthly_budget" type="number" min="0" step="0.01"
+                   value="{{ '%.2f'|format(monthly_budget) if monthly_budget > 0 else '' }}"
+                   placeholder="Enter budget" required>
+            <button class="button" type="submit">Save budget</button>
+        </form>
     </section>
 
     <section class="card">
@@ -27,6 +56,18 @@
             {% for category, amount in totals_by_category.items() %}
                 <div class="category-item">
                     <span>{{ category|capitalize }}</span>
+                    <strong>{{ "%.2f"|format(amount) }}</strong>
+                </div>
+            {% endfor %}
+        </div>
+        <h3 class="chart-heading">Spending chart</h3>
+        <div class="category-chart" role="img" aria-label="Bar chart of spending by category this month">
+            {% for category, amount in totals_by_category.items() %}
+                <div class="chart-row">
+                    <span>{{ category|capitalize }}</span>
+                    <div class="chart-track">
+                        <div class="chart-bar" style="width: {{ (amount / chart_max * 100) if chart_max else 0 }}%"></div>
+                    </div>
                     <strong>{{ "%.2f"|format(amount) }}</strong>
                 </div>
             {% endfor %}
@@ -40,8 +81,11 @@
         </div>
         {% if recent_expenses %}
             <ul class="expense-list">
-                {% for expense in recent_expenses %}
-                    <li><span>{{ expense.category|capitalize }}</span><strong>{{ "%.2f"|format(expense.amount) }}</strong></li>
+                {% for index, expense in recent_expenses %}
+                    <li>
+                        <span>{{ expense.date }} · {{ expense.category|capitalize }}</span>
+                        <span><strong>{{ "%.2f"|format(expense.amount) }}</strong> · <a href="{{ url_for('edit_expense', index=index) }}">Edit</a></span>
+                    </li>
                 {% endfor %}
             </ul>
         {% else %}

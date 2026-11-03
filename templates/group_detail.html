@@ -1,0 +1,195 @@
+{% extends "base.html" %}
+{% block title %}{{ group.name }} | Shared group{% endblock %}
+{% block content %}
+    <section class="page-heading">
+        <div>
+            <p class="eyebrow"><a href="{{ url_for('groups') }}">SHARED GROUPS</a></p>
+            <h1>{{ group.name }}</h1>
+            <p class="muted">Shared locally on this device · {{ members|length }} members</p>
+        </div>
+    </section>
+
+    <section class="card">
+        <div class="section-heading">
+            <h2>Balances</h2>
+            <span class="muted">Positive means owed to them; negative means they owe.</span>
+        </div>
+        <div class="balance-grid">
+            {% for member in members %}
+                {% set balance = balances[member.id] %}
+                <article class="balance-item">
+                    <span>{{ member.name }}</span>
+                    {% if balance > 0 %}
+                        <strong class="balance-positive">{{ balance|inr }} to receive</strong>
+                    {% elif balance < 0 %}
+                        <strong class="balance-negative">{{ (-balance)|inr }} to pay</strong>
+                    {% else %}
+                        <strong class="balance-even">Settled up</strong>
+                    {% endif %}
+                </article>
+            {% endfor %}
+        </div>
+        {% if suggestions %}
+            <h3 class="chart-heading">Suggested settlements</h3>
+            <ul class="settlement-suggestions">
+                {% for suggestion in suggestions %}
+                    <li>
+                        <span><strong>{{ suggestion.from_name }}</strong> pays <strong>{{ suggestion.to_name }}</strong> {{ suggestion.amount|inr }}</span>
+                        <form method="post" action="{{ url_for('add_group_settlement', group_id=group.id) }}">
+                            <input type="hidden" name="paid_by" value="{{ suggestion.from_id }}">
+                            <input type="hidden" name="paid_to" value="{{ suggestion.to_id }}">
+                            <input type="hidden" name="amount" value="{{ suggestion.amount|paise_input }}">
+                            <input type="hidden" name="date" value="{{ today }}">
+                            <button class="button small-button" type="submit">Record payment</button>
+                        </form>
+                    </li>
+                {% endfor %}
+            </ul>
+        {% else %}
+            <p class="muted settlement-clear">Everyone is settled up.</p>
+        {% endif %}
+    </section>
+
+    <section class="card">
+        <h2>Members</h2>
+        <p class="muted email-note">Add a member’s email to include them when you share an expense. Email sharing opens your email app; it does not give members online access to this local group.</p>
+        <div class="member-email-list">
+            {% for member in members %}
+                <form class="member-email-form" method="post" action="{{ url_for('update_group_member_email', group_id=group.id, member_id=member.id) }}">
+                    <label for="member-email-{{ member.id }}">{{ member.name }}</label>
+                    <input id="member-email-{{ member.id }}" name="email" type="email" maxlength="254"
+                           value="{{ member.email }}" placeholder="name@example.com">
+                    <button class="edit-button" type="submit">Save email</button>
+                </form>
+            {% endfor %}
+        </div>
+        <form class="inline-form" method="post" action="{{ url_for('add_group_member', group_id=group.id) }}">
+            <label for="new-member">Add a friend or family member</label>
+            <input id="new-member" name="name" maxlength="60" placeholder="Their name" required>
+            <input name="email" type="email" maxlength="254" placeholder="Their email (optional)">
+            <button class="button" type="submit">Add member</button>
+        </form>
+    </section>
+
+    <section class="card">
+        <h2>Add a shared expense</h2>
+        <form class="expense-form shared-expense-form" method="post" action="{{ url_for('add_group_expense', group_id=group.id) }}">
+            <label for="description">What was it for?</label>
+            <input id="description" name="description" maxlength="120" placeholder="e.g. Dinner" required>
+
+            <label for="shared-amount">Total amount ({{ group.currency }})</label>
+            <input id="shared-amount" name="amount" type="number" min="0.01" step="0.01" placeholder="0.00" required>
+
+            <label for="expense-date">Date</label>
+            <input id="expense-date" name="date" type="date" value="{{ today }}" required>
+
+            <label for="paid-by">Who paid?</label>
+            <select id="paid-by" name="paid_by" required>
+                {% for member in members %}
+                    <option value="{{ member.id }}">{{ member.name }}</option>
+                {% endfor %}
+            </select>
+
+            <fieldset class="participant-fieldset">
+                <legend>Split with</legend>
+                <div class="participant-grid">
+                    {% for member in members %}
+                        <label class="participant-option">
+                            <input type="checkbox" name="participants" value="{{ member.id }}" checked>
+                            <span>{{ member.name }}</span>
+                        </label>
+                    {% endfor %}
+                </div>
+            </fieldset>
+
+            <fieldset class="participant-fieldset">
+                <legend>Split method</legend>
+                <div class="split-options">
+                    <label><input type="radio" name="split_type" value="equal" checked> Split equally</label>
+                    <label><input type="radio" name="split_type" value="custom"> Set custom shares</label>
+                </div>
+                <div class="custom-shares" hidden>
+                    <p class="muted">Enter a share for each selected person. Shares must add up to the total.</p>
+                    {% for member in members %}
+                        <label class="share-input" data-member-id="{{ member.id }}">
+                            <span>{{ member.name }}</span>
+                            <input name="share_{{ member.id }}" type="number" min="0.01" step="0.01" placeholder="0.00">
+                        </label>
+                    {% endfor %}
+                </div>
+            </fieldset>
+            <button class="button" type="submit">Add shared expense</button>
+        </form>
+    </section>
+
+    <section class="card">
+        <h2>Shared expenses</h2>
+        {% if expenses %}
+            <div class="table-wrap">
+                <table>
+                    <thead><tr><th>Date and description</th><th>Paid by</th><th>Split</th><th class="amount">Total</th><th></th></tr></thead>
+                    <tbody>
+                        {% for expense in expenses %}
+                            <tr>
+                                <td><strong>{{ expense.description }}</strong><br><span class="muted">{{ expense.date }}</span></td>
+                                <td>{{ member_names[expense.paid_by] }}</td>
+                                <td>
+                                    {% for member_id, share in expense.shares.items() %}
+                                        {{ member_names[member_id] }} {{ share|inr }}{% if not loop.last %}<br>{% endif %}
+                                    {% endfor %}
+                                </td>
+                                <td class="amount">{{ expense.amount|inr }}</td>
+                                <td class="row-action">
+                                    <div class="row-actions">
+                                        <a class="edit-button" href="{{ email_share_links[expense.id] }}">Share by email</a>
+                                        <form method="post" action="{{ url_for('delete_group_expense', group_id=group.id, expense_id=expense.id) }}"
+                                              onsubmit="return confirm('Delete this shared expense? Balances will be recalculated.');">
+                                            <button class="delete-button" type="submit">Delete</button>
+                                        </form>
+                                    </div>
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        {% else %}
+            <p class="muted">No shared expenses yet.</p>
+        {% endif %}
+    </section>
+
+    <section class="card">
+        <h2>Settlements</h2>
+        {% if settlements %}
+            <ul class="settlement-history">
+                {% for settlement in settlements %}
+                    <li>
+                        <span>{{ settlement.date }} · {{ member_names[settlement.paid_by] }} paid {{ member_names[settlement.paid_to] }}</span>
+                        <strong>{{ settlement.amount|inr }}</strong>
+                    </li>
+                {% endfor %}
+            </ul>
+        {% else %}
+            <p class="muted">Recorded repayments will appear here.</p>
+        {% endif %}
+    </section>
+
+    <script>
+        const splitOptions = document.querySelectorAll('input[name="split_type"]');
+        const customShares = document.querySelector(".custom-shares");
+        const participantBoxes = document.querySelectorAll('input[name="participants"]');
+
+        function updateShareFields() {
+            const isCustom = document.querySelector('input[name="split_type"]:checked').value === "custom";
+            customShares.hidden = !isCustom;
+            customShares.querySelectorAll(".share-input").forEach((row) => {
+                const selected = document.querySelector(`input[name="participants"][value="${row.dataset.memberId}"]`).checked;
+                row.hidden = !selected;
+                row.querySelector("input").required = isCustom && selected;
+            });
+        }
+
+        splitOptions.forEach((option) => option.addEventListener("change", updateShareFields));
+        participantBoxes.forEach((checkbox) => checkbox.addEventListener("change", updateShareFields));
+    </script>
+{% endblock %}

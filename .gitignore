@@ -1,4 +1,6 @@
 expenses.json
+budget.json
+group_data.json
 __pycache__/
 *.py[cod]
 .venv/

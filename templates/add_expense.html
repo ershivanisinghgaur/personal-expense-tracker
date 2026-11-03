@@ -1,25 +1,31 @@
 {% extends "base.html" %}
-{% block title %}Add expense | Expense Tracker{% endblock %}
+{% block title %}{{ title }}{% endblock %}
 {% block content %}
     <section class="page-heading">
         <div>
             <p class="eyebrow">KEEP TRACK</p>
-            <h1>Add an expense</h1>
-            <p class="muted">Record a purchase in a couple of seconds.</p>
+            <h1>{{ heading }}</h1>
+            <p class="muted">Record when and where you spent.</p>
         </div>
     </section>
-    <form class="card expense-form" method="post">
+    <form class="card expense-form" method="post" action="{{ form_action }}">
         <label for="category">Category</label>
         <select id="category" name="category" required>
-            <option value="" disabled selected>Choose a category</option>
+            <option value="" disabled {% if not values.get('category') %}selected{% endif %}>Choose a category</option>
             {% for category in categories %}
-                <option value="{{ category }}">{{ category|capitalize }}</option>
+                <option value="{{ category }}" {% if values.get('category') == category %}selected{% endif %}>{{ category|capitalize }}</option>
             {% endfor %}
         </select>
 
         <label for="amount">Amount</label>
-        <input id="amount" name="amount" type="number" min="0.01" step="0.01" placeholder="0.00" required>
+        <input id="amount" name="amount" type="number" min="0.01" step="0.01" placeholder="0.00" value="{{ values.get('amount', '') }}" required>
 
-        <button class="button" type="submit">Save expense</button>
+        <label for="date">Date</label>
+        <input id="date" name="date" type="date" value="{{ values.get('date', '') }}" required>
+
+        <button class="button" type="submit">{{ submit_label }}</button>
+        {% if index is not none %}
+            <a class="cancel-link" href="{{ url_for('history') }}">Cancel</a>
+        {% endif %}
     </form>
 {% endblock %}

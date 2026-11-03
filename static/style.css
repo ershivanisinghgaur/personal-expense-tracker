@@ -58,6 +58,30 @@ h2 { margin: 0; font-size: 19px; }
 .expense-list { list-style: none; margin: 14px 0 0; padding: 0; }
 .expense-list li { display: flex; justify-content: space-between; padding: 14px 0; border-top: 1px solid #edf0ed; }
 .section-heading { margin-bottom: 8px; }
+.budget-status { margin: 8px 0 0; }
+.budget-amount { font: 800 24px "Manrope", sans-serif; }
+.over-budget { color: #a23b30; font-weight: 700; }
+.budget-form, .filter-form { display: flex; align-items: end; flex-wrap: wrap; gap: 10px; }
+.budget-form { margin-top: 20px; }
+.budget-form label, .filter-form label { font-size: 13px; font-weight: 700; }
+.budget-form input, .filter-form input, .filter-form select {
+    min-height: 42px;
+    padding: 9px 11px;
+    border: 1px solid #dce4de;
+    border-radius: 8px;
+    background: #fff;
+    color: inherit;
+    font: inherit;
+}
+.budget-form input { width: 180px; }
+.filter-form { margin-bottom: 22px; }
+.filter-form .button { padding: 11px 16px; }
+.chart-heading { margin: 28px 0 12px; font: 700 15px "Manrope", sans-serif; }
+.category-chart { display: grid; gap: 12px; }
+.chart-row { display: grid; grid-template-columns: 90px minmax(60px, 1fr) 80px; align-items: center; gap: 12px; font-size: 13px; }
+.chart-row > strong { text-align: right; }
+.chart-track { height: 12px; overflow: hidden; border-radius: 99px; background: #edf2ee; }
+.chart-bar { height: 100%; min-width: 0; border-radius: inherit; background: #38a181; }
 .expense-form { max-width: 520px; display: grid; gap: 11px; }
 .expense-form label { margin-top: 6px; font-size: 14px; font-weight: 700; }
 .expense-form input, .expense-form select { width: 100%; padding: 12px; border: 1px solid #dce4de; border-radius: 8px; background: #fff; color: inherit; font: inherit; }
@@ -72,16 +96,50 @@ thead th, tfoot th { color: #53635b; font-size: 13px; }
 .amount { text-align: right; }
 .row-action { text-align: right; }
 .row-action form { margin: 0; }
+.row-actions { display: flex; align-items: center; justify-content: flex-end; gap: 8px; }
+.edit-button, .delete-button { border: 1px solid #dce4de; border-radius: 7px; padding: 7px 10px; background: #fff; font: 600 13px "DM Sans", sans-serif; cursor: pointer; }
+.edit-button { color: #147d63; }
+.edit-button:hover { background: #eaf5ef; }
 .delete-button {
     border: 1px solid #f0d2cd;
-    border-radius: 7px;
-    padding: 7px 10px;
     color: #a23b30;
     background: #fff8f6;
-    font: 600 13px "DM Sans", sans-serif;
-    cursor: pointer;
 }
 .delete-button:hover { background: #fde9e5; }
+.cancel-link { justify-self: start; padding: 10px 0; }
+.group-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 12px; margin-top: 18px; }
+.group-card { display: grid; gap: 8px; padding: 18px; border: 1px solid #e3ebe5; border-radius: 10px; background: #f8faf8; }
+.group-card:hover { border-color: #9dcdb8; background: #f0f8f3; }
+.group-create-form { margin-top: 18px; }
+.balance-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; margin-top: 20px; }
+.balance-item { display: grid; gap: 8px; padding: 16px; border-radius: 10px; background: #f5f7f4; }
+.balance-positive { color: #147d63; }
+.balance-negative { color: #a23b30; }
+.balance-even { color: #718078; }
+.settlement-suggestions, .settlement-history { list-style: none; padding: 0; margin: 0; }
+.settlement-suggestions li, .settlement-history li { display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 13px 0; border-top: 1px solid #edf0ed; }
+.settlement-clear { margin: 18px 0 0; }
+.small-button { padding: 9px 12px; font-size: 13px; }
+.member-chips, .participant-grid { display: flex; flex-wrap: wrap; gap: 9px; margin: 14px 0 20px; }
+.member-chip { padding: 7px 12px; border-radius: 99px; background: #eaf5ef; color: #12664f; font-size: 13px; font-weight: 600; }
+.email-note { margin: 12px 0; }
+.member-email-list { display: grid; gap: 10px; margin: 16px 0 22px; }
+.member-email-form { display: grid; grid-template-columns: minmax(100px, .7fr) minmax(180px, 1fr) auto; align-items: center; gap: 10px; padding: 12px; border-radius: 8px; background: #f8faf8; }
+.member-email-form label { font-size: 14px; font-weight: 700; }
+.member-email-form input { min-width: 0; min-height: 40px; padding: 9px 11px; border: 1px solid #dce4de; border-radius: 8px; font: inherit; }
+.inline-form { display: flex; align-items: end; flex-wrap: wrap; gap: 10px; }
+.inline-form label { flex-basis: 100%; font-size: 14px; font-weight: 700; }
+.inline-form input { min-height: 42px; flex: 1; padding: 10px 12px; border: 1px solid #dce4de; border-radius: 8px; font: inherit; }
+.participant-fieldset { min-width: 0; margin: 8px 0; padding: 14px; border: 1px solid #dce4de; border-radius: 8px; }
+.participant-fieldset legend { padding: 0 6px; font-size: 14px; font-weight: 700; }
+.participant-option, .split-options label { display: inline-flex; align-items: center; gap: 7px; padding: 7px 10px; border-radius: 7px; background: #f5f7f4; }
+.split-options { display: flex; flex-wrap: wrap; gap: 10px; }
+.custom-shares { display: grid; gap: 10px; margin-top: 14px; }
+.custom-shares[hidden] { display: none; }
+.custom-shares p { margin: 0; }
+.share-input { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.share-input[hidden] { display: none; }
+.share-input input { max-width: 180px; }
 tfoot th { border-bottom: 0; padding-top: 19px; }
 @media (max-width: 600px) {
     .site-header { padding: 14px 6vw; flex-direction: column; align-items: stretch; gap: 10px; }
@@ -91,4 +149,15 @@ tfoot th { border-bottom: 0; padding-top: 19px; }
     .page-heading { align-items: flex-start; flex-direction: column; }
     .summary-grid { grid-template-columns: 1fr; gap: 0; }
     .category-grid { grid-template-columns: repeat(2, 1fr); }
+    .budget-form { align-items: stretch; flex-direction: column; }
+    .budget-form input { width: 100%; }
+    .filter-form { align-items: stretch; }
+    .filter-form label { width: 100%; }
+    .filter-form select, .filter-form input { flex: 1 1 100%; }
+    .chart-row { grid-template-columns: 74px minmax(40px, 1fr) 68px; gap: 8px; }
+    .row-actions { align-items: flex-end; flex-direction: column; }
+    .settlement-suggestions li, .settlement-history li { align-items: flex-start; flex-direction: column; }
+    .inline-form { align-items: stretch; flex-direction: column; }
+    .inline-form input { width: 100%; }
+    .member-email-form { grid-template-columns: 1fr; }
 }
