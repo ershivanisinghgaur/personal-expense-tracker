@@ -1,0 +1,70 @@
+{% extends "base.html" %}
+{% block title %}{{ {'register': 'Create account', 'forgot-password': 'Reset password', 'recovery-code': 'Save recovery code'}.get(mode, 'Sign in') }} | SpendWise{% endblock %}
+{% block content %}
+    <section class="auth-layout" aria-label="SpendWise account access">
+        <div class="auth-intro">
+            <a class="auth-brand" href="{{ url_for('login') }}">
+                <span class="brand-mark" aria-hidden="true">S</span>
+                <span>SpendWise</span>
+            </a>
+            <div class="auth-intro-copy">
+                <p class="eyebrow">A CLEARER VIEW OF YOUR MONEY</p>
+                <h1>Make room for what matters.</h1>
+                <p>Your spending, budget, and shared costs, all in one calm place.</p>
+            </div>
+            <p class="auth-local-note"><span aria-hidden="true">✓</span> Your account data stays on this device.</p>
+        </div>
+        <div class="auth-form-panel">
+            <div class="auth-form-wrap">
+                {% if mode == 'recovery-code' %}
+                    <p class="eyebrow">ACCOUNT RECOVERY</p>
+                    <h2>Save your recovery code</h2>
+                    <p class="auth-subtitle">Keep this code somewhere private. It can reset your password and will only be shown once.</p>
+                    <code class="recovery-code-display" id="recovery-code">{{ recovery_code }}</code>
+                    <a class="button auth-submit auth-continue" href="{{ url_for('dashboard') if logged_in|default(false) else url_for('login') }}">{{ 'Continue to SpendWise' if logged_in|default(false) else 'Back to sign in' }}</a>
+                {% elif mode == 'forgot-password' %}
+                    <p class="eyebrow">ACCOUNT RECOVERY</p>
+                    <h2>Reset your password</h2>
+                    <p class="auth-subtitle">Enter your username and saved recovery code.</p>
+                    <form class="auth-form" method="post" action="{{ url_for('forgot_password') }}">
+                        <label for="username">Username</label>
+                        <input id="username" name="username" type="text" value="{{ username|default('') }}" autocomplete="username" required autofocus>
+                        <label for="recovery-code-input">Recovery code</label>
+                        <input id="recovery-code-input" name="recovery_code" type="text" autocomplete="off" autocapitalize="characters" spellcheck="false" required>
+                        <label for="password">New password</label>
+                        <input id="password" name="password" type="password" autocomplete="new-password" minlength="8" required>
+                        <label for="confirm-password">Confirm new password</label>
+                        <input id="confirm-password" name="confirm_password" type="password" autocomplete="new-password" minlength="8" required>
+                        <button class="button auth-submit" type="submit">Reset password</button>
+                    </form>
+                    <p class="auth-switch"><a href="{{ url_for('login') }}">Back to sign in</a></p>
+                {% else %}
+                <p class="eyebrow">{{ 'GET STARTED' if mode == 'register' else 'WELCOME BACK' }}</p>
+                <h2>{{ 'Create your account' if mode == 'register' else 'Sign in to SpendWise' }}</h2>
+                <p class="auth-subtitle">{{ 'Set up a private space for your finances.' if mode == 'register' else 'Pick up where you left off.' }}</p>
+                <form class="auth-form" method="post" action="{{ url_for('register' if mode == 'register' else 'login') }}">
+                    <label for="username">Username</label>
+                    <input id="username" name="username" type="text" value="{{ username|default('') }}" autocomplete="username" minlength="3" maxlength="32" required autofocus>
+                    <label for="password">Password</label>
+                    <input id="password" name="password" type="password" autocomplete="{{ 'new-password' if mode == 'register' else 'current-password' }}" minlength="8" required>
+                    {% if mode == 'register' %}
+                        <label for="confirm-password">Confirm password</label>
+                        <input id="confirm-password" name="confirm_password" type="password" autocomplete="new-password" minlength="8" required>
+                    {% endif %}
+                    <button class="button auth-submit" type="submit">{{ 'Create account' if mode == 'register' else 'Sign in' }}</button>
+                </form>
+                <p class="auth-switch">
+                    {% if mode == 'register' %}
+                        Already have an account? <a href="{{ url_for('login') }}">Sign in</a>
+                    {% else %}
+                        New to SpendWise? <a href="{{ url_for('register') }}">Create an account</a>
+                    {% endif %}
+                </p>
+                {% if mode == 'login' %}
+                    <p class="auth-switch auth-forgot-link"><a href="{{ url_for('forgot_password') }}">Forgot password?</a></p>
+                {% endif %}
+                {% endif %}
+            </div>
+        </div>
+    </section>
+{% endblock %}

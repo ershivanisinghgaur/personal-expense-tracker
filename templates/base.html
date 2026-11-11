@@ -6,17 +6,50 @@
     <title>{% block title %}Expense Tracker{% endblock %}</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
-<body>
-    <header class="site-header">
-        <a class="site-title" href="{{ url_for('dashboard') }}">Expense tracker</a>
-        <nav aria-label="Main navigation">
-            <a class="{{ 'active' if request.endpoint == 'dashboard' else '' }}" href="{{ url_for('dashboard') }}">Dashboard</a>
-            <a class="{{ 'active' if request.endpoint == 'add_expense' else '' }}" href="{{ url_for('add_expense') }}">Add expense</a>
-            <a class="{{ 'active' if request.endpoint in ('history', 'delete_expense', 'edit_expense') else '' }}" href="{{ url_for('history') }}">History</a>
-            <a class="{{ 'active' if request.endpoint in ('groups', 'group_detail') else '' }}" href="{{ url_for('groups') }}">Shared groups</a>
-        </nav>
-    </header>
-    <main class="container">
+<body class="{% if request.endpoint in ('login', 'register', 'forgot_password') %}auth-body{% elif request.endpoint in ('dashboard', 'history', 'groups', 'group_detail') %}dashboard-body{% endif %}">
+    {% if request.endpoint in ('login', 'register', 'forgot_password') %}
+        <main class="auth-container">
+    {% elif request.endpoint in ('dashboard', 'history', 'groups', 'group_detail') %}
+        <div class="dashboard-app">
+            <aside class="dashboard-sidebar">
+                <a class="dashboard-brand" href="{{ url_for('dashboard') }}">
+                    <span class="brand-mark" aria-hidden="true">S</span>
+                    <span>SpendWise</span>
+                </a>
+                <nav aria-label="Main navigation">
+                    <a class="{{ 'active' if request.endpoint == 'dashboard' else '' }}" {% if request.endpoint == 'dashboard' %}aria-current="page"{% endif %} href="{{ url_for('dashboard') }}"><span aria-hidden="true">▦</span>Dashboard</a>
+                    <a class="{{ 'active' if request.endpoint == 'history' else '' }}" {% if request.endpoint == 'history' %}aria-current="page"{% endif %} href="{{ url_for('history') }}"><span aria-hidden="true">▤</span>Expenses</a>
+                    <a class="{{ 'active' if request.endpoint in ('groups', 'group_detail') else '' }}" {% if request.endpoint in ('groups', 'group_detail') %}aria-current="page"{% endif %} href="{{ url_for('groups') }}"><span aria-hidden="true">♧</span>Shared groups</a>
+                </nav>
+                <div class="sidebar-note">
+                    <span class="security-mark" aria-hidden="true">✓</span>
+                    <span><strong>Your data stays local</strong><small>Saved on this device</small></span>
+                </div>
+            </aside>
+            <div class="dashboard-main">
+                <header class="dashboard-topbar">
+                    <span class="topbar-context">Personal finance · {{ session.get('username') }}</span>
+                    <span class="topbar-date"><span aria-hidden="true">◷</span>{{ current_month_label }}</span>
+                    <a class="recovery-code-link" href="{{ url_for('recovery_code_settings') }}">Recovery code</a>
+                    <form class="logout-form" method="post" action="{{ url_for('logout') }}">
+                        <button class="logout-button" type="submit">Sign out</button>
+                    </form>
+                </header>
+                <main class="container dashboard-container">
+    {% else %}
+        <header class="site-header">
+            <a class="site-title" href="{{ url_for('dashboard') }}">Expense tracker</a>
+            <nav aria-label="Main navigation">
+                <a class="{{ 'active' if request.endpoint == 'dashboard' else '' }}" href="{{ url_for('dashboard') }}">Dashboard</a>
+                <a class="{{ 'active' if request.endpoint in ('history', 'delete_expense', 'edit_expense') else '' }}" href="{{ url_for('history') }}">History</a>
+                <a class="{{ 'active' if request.endpoint in ('groups', 'group_detail') else '' }}" href="{{ url_for('groups') }}">Shared groups</a>
+            </nav>
+            <form class="logout-form" method="post" action="{{ url_for('logout') }}">
+                <button class="logout-button" type="submit">Sign out</button>
+            </form>
+        </header>
+        <main class="container">
+    {% endif %}
         {% with messages = get_flashed_messages(with_categories=true) %}
             {% if messages %}
                 {% for category, message in messages %}
@@ -26,5 +59,9 @@
         {% endwith %}
         {% block content %}{% endblock %}
     </main>
+    {% if request.endpoint in ('dashboard', 'history', 'groups', 'group_detail') %}
+            </div>
+        </div>
+    {% endif %}
 </body>
 </html>

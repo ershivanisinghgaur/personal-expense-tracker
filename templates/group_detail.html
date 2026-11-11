@@ -1,19 +1,47 @@
 {% extends "base.html" %}
-{% block title %}{{ group.name }} | Shared group{% endblock %}
+{% block title %}{{ group.name }} | Shared groups | SpendWise{% endblock %}
 {% block content %}
-    <section class="page-heading">
+    <section class="dashboard-heading expenses-heading">
         <div>
-            <p class="eyebrow"><a href="{{ url_for('groups') }}">SHARED GROUPS</a></p>
+            <p class="eyebrow"><a href="{{ url_for('groups') }}">SHARED GROUPS</a> · LOCAL LEDGER</p>
             <h1>{{ group.name }}</h1>
             <p class="muted">Shared locally on this device · {{ members|length }} members</p>
         </div>
+        <a class="button dashboard-add-button" href="#add-shared-expense"><span aria-hidden="true">＋</span> Add shared expense</a>
     </section>
 
-    <section class="card">
-        <div class="section-heading">
-            <h2>Balances</h2>
-            <span class="muted">Positive means owed to them; negative means they owe.</span>
+    <section class="groups-overview group-detail-overview" aria-label="Group overview">
+        <article class="groups-overview-card">
+            <span class="groups-overview-icon" aria-hidden="true">₹</span>
+            <div>
+                <p class="groups-overview-label">Shared spending</p>
+                <p class="groups-overview-value">{{ expenses|sum(attribute='amount')|inr }}</p>
+            </div>
+        </article>
+        <article class="groups-overview-card">
+            <span class="groups-overview-icon groups-overview-icon-muted" aria-hidden="true">♙</span>
+            <div>
+                <p class="groups-overview-label">Members</p>
+                <p class="groups-overview-value">{{ members|length }}</p>
+            </div>
+        </article>
+        <article class="groups-overview-card">
+            <span class="groups-overview-icon groups-overview-icon-warm" aria-hidden="true">▤</span>
+            <div>
+                <p class="groups-overview-label">Shared expenses</p>
+                <p class="groups-overview-value">{{ expenses|length }}</p>
+            </div>
+        </article>
+    </section>
+
+    <section class="dashboard-panel groups-detail-panel">
+        <div class="panel-heading">
+            <div>
+                <p class="eyebrow">WHO OWES WHOM</p>
+                <h2>Balances</h2>
+            </div>
         </div>
+        <p class="groups-detail-hint">Positive means owed to them; negative means they owe.</p>
         <div class="balance-grid">
             {% for member in members %}
                 {% set balance = balances[member.id] %}
@@ -50,15 +78,20 @@
         {% endif %}
     </section>
 
-    <section class="card">
-        <h2>Members</h2>
-        <p class="muted email-note">Add a member’s email to include them when you share an expense. Email sharing opens your email app; it does not give members online access to this local group.</p>
+    <section class="dashboard-panel groups-detail-panel">
+        <div class="panel-heading">
+            <div>
+                <p class="eyebrow">YOUR GROUP</p>
+                <h2>Members</h2>
+            </div>
+        </div>
+        <p class="muted email-note">Add participant email addresses to send expense summaries through Gmail.</p>
         <div class="member-email-list">
             {% for member in members %}
                 <form class="member-email-form" method="post" action="{{ url_for('update_group_member_email', group_id=group.id, member_id=member.id) }}">
                     <label for="member-email-{{ member.id }}">{{ member.name }}</label>
                     <input id="member-email-{{ member.id }}" name="email" type="email" maxlength="254"
-                           value="{{ member.email }}" placeholder="name@example.com">
+                           value="{{ member.get('email', '') }}" placeholder="name@example.com">
                     <button class="edit-button" type="submit">Save email</button>
                 </form>
             {% endfor %}
@@ -71,8 +104,14 @@
         </form>
     </section>
 
-    <section class="card">
-        <h2>Add a shared expense</h2>
+    <section class="dashboard-panel groups-detail-panel" id="add-shared-expense">
+        <div class="panel-heading">
+            <div>
+                <p class="eyebrow">SPLIT A COST</p>
+                <h2>Add a shared expense</h2>
+            </div>
+            <span class="panel-icon" aria-hidden="true">＋</span>
+        </div>
         <form class="expense-form shared-expense-form" method="post" action="{{ url_for('add_group_expense', group_id=group.id) }}">
             <label for="description">What was it for?</label>
             <input id="description" name="description" maxlength="120" placeholder="e.g. Dinner" required>
@@ -122,8 +161,13 @@
         </form>
     </section>
 
-    <section class="card">
-        <h2>Shared expenses</h2>
+    <section class="dashboard-panel groups-detail-panel">
+        <div class="panel-heading">
+            <div>
+                <p class="eyebrow">GROUP LEDGER</p>
+                <h2>Shared expenses</h2>
+            </div>
+        </div>
         {% if expenses %}
             <div class="table-wrap">
                 <table>
@@ -141,7 +185,7 @@
                                 <td class="amount">{{ expense.amount|inr }}</td>
                                 <td class="row-action">
                                     <div class="row-actions">
-                                        <a class="edit-button" href="{{ email_share_links[expense.id] }}">Share by email</a>
+                                        <a class="edit-button" href="{{ gmail_compose_links[expense.id] }}" target="_blank" rel="noopener">Gmail</a>
                                         <form method="post" action="{{ url_for('delete_group_expense', group_id=group.id, expense_id=expense.id) }}"
                                               onsubmit="return confirm('Delete this shared expense? Balances will be recalculated.');">
                                             <button class="delete-button" type="submit">Delete</button>
@@ -158,8 +202,13 @@
         {% endif %}
     </section>
 
-    <section class="card">
-        <h2>Settlements</h2>
+    <section class="dashboard-panel groups-detail-panel">
+        <div class="panel-heading">
+            <div>
+                <p class="eyebrow">PAYMENTS RECORDED</p>
+                <h2>Settlements</h2>
+            </div>
+        </div>
         {% if settlements %}
             <ul class="settlement-history">
                 {% for settlement in settlements %}

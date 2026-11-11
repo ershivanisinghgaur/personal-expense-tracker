@@ -4,7 +4,7 @@ import tempfile
 import unittest
 from html import unescape
 from pathlib import Path
-from urllib.parse import parse_qs, unquote, urlsplit
+from urllib.parse import parse_qs, urlsplit
 from unittest.mock import patch
 
 import main
@@ -14,14 +14,36 @@ class SharedGroupTests(unittest.TestCase):
     def setUp(self):
         self.temp_dir = tempfile.TemporaryDirectory()
         self.group_data_path = Path(self.temp_dir.name) / "group_data.json"
+        self.data_path = Path(self.temp_dir.name) / "expenses.json"
+        self.budget_path = Path(self.temp_dir.name) / "budget.json"
+        self.user_data_path = Path(self.temp_dir.name) / "user-data"
+        self.account_db_path = Path(self.temp_dir.name) / "accounts.sqlite3"
         self.group_data_patch = patch.object(
             main, "group_data_file", self.group_data_path
         )
         self.group_data_patch.start()
+        self.data_path_patch = patch.object(main, "data_file", self.data_path)
+        self.budget_path_patch = patch.object(main, "budget_file", self.budget_path)
+        self.user_data_path_patch = patch.object(main, "user_data_dir", self.user_data_path)
+        self.account_db_path_patch = patch.object(main, "account_db_file", self.account_db_path)
+        self.data_path_patch.start()
+        self.budget_path_patch.start()
+        self.user_data_path_patch.start()
+        self.account_db_path_patch.start()
         self.addCleanup(self.group_data_patch.stop)
+        self.addCleanup(self.data_path_patch.stop)
+        self.addCleanup(self.budget_path_patch.stop)
+        self.addCleanup(self.user_data_path_patch.stop)
+        self.addCleanup(self.account_db_path_patch.stop)
         self.addCleanup(self.temp_dir.cleanup)
         main.app.config["TESTING"] = True
         self.client = main.app.test_client()
+        self.client.post(
+            "/register",
+            data={"username": "group-tester", "password": "correct-horse", "confirm_password": "correct-horse"},
+        )
+        with self.client.session_transaction() as session:
+            self.user_id = session["user_id"]
         response = self.client.post(
             "/groups", data={"name": "Family trip", "creator": "Asha"}
         )
@@ -34,7 +56,8 @@ class SharedGroupTests(unittest.TestCase):
         ] + self.add_members()
 
     def read_group(self):
-        return json.loads(self.group_data_path.read_text(encoding="utf-8"))[0]
+        user_group_path = self.user_data_path / str(self.user_id) / self.group_data_path.name
+        return json.loads(user_group_path.read_text(encoding="utf-8"))[0]
 
     def add_members(self):
         for name in ("Rahul", "Mina"):
@@ -54,7 +77,7 @@ class SharedGroupTests(unittest.TestCase):
             ["Asha", "Rahul", "Mina"],
         )
 
-    def test_member_email_can_be_saved_and_used_in_expense_email(self):
+    def test_gmail_compose_is_prefilled_for_participants(self):
         for member_id, email in (
             (self.asha, "asha@example.com"),
             (self.rahul, "rahul@example.com"),
@@ -68,7 +91,7 @@ class SharedGroupTests(unittest.TestCase):
         response = self.client.post(
             f"/groups/{self.group_id}/expenses",
             data={
-                "description": "Family dinner",
+                "description": "Dinner",
                 "amount": "45.50",
                 "date": "2026-03-10",
                 "paid_by": self.asha,
@@ -77,33 +100,19 @@ class SharedGroupTests(unittest.TestCase):
             },
         )
         self.assertEqual(response.status_code, 302)
-
         page = self.client.get(f"/groups/{self.group_id}")
+        self.assertEqual(page.status_code, 200)
+        self.assertNotIn(b"Send with Gmail", page.data)
         markup = page.data.decode()
-        match = re.search(r'href="(mailto:[^"]+)"[^>]*>Share by email', markup)
-        self.assertIsNotNone(match)
-        mailto = urlsplit(unescape(match.group(1)))
-        self.assertEqual(mailto.scheme, "mailto")
-        self.assertEqual(
-            unquote(mailto.path),
-            "asha@example.com,rahul@example.com",
+        compose_match = re.search(
+            r'href="(https://mail\.google\.com/mail/\?[^\"]+)"[^>]*>Gmail',
+            markup,
         )
-        query = parse_qs(mailto.query)
-        self.assertEqual(
-            query["subject"], ["Family trip expense: Family dinner"]
-        )
-        self.assertIn("Total: ₹45.50", query["body"][0])
-        self.assertIn("Asha: ₹22.75", query["body"][0])
-        self.assertIn("Rahul: ₹22.75", query["body"][0])
-
-    def test_invalid_member_email_is_rejected(self):
-        response = self.client.post(
-            f"/groups/{self.group_id}/members/{self.asha}/email",
-            data={"email": "not-an-email"},
-        )
-
-        self.assertEqual(response.status_code, 302)
-        self.assertEqual(self.read_group()["members"][0]["email"], "")
+        self.assertIsNotNone(compose_match)
+        compose_query = parse_qs(urlsplit(unescape(compose_match.group(1))).query)
+        self.assertEqual(compose_query["to"], ["asha@example.com,rahul@example.com"])
+        self.assertEqual(compose_query["su"], ["Family trip expense: Dinner"])
+        self.assertIn("Asha: ₹22.75", compose_query["body"][0])
 
     def test_equal_split_assigns_remainder_and_suggests_balances(self):
         response = self.client.post(

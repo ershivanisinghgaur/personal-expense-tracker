@@ -3,19 +3,25 @@ import math
 import os
 import re
 import secrets
+import shutil
+import sqlite3
 import sys
+from contextlib import closing
 from datetime import date
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
 from urllib.parse import quote, urlencode
 from uuid import uuid4
 
-from flask import Flask, flash, redirect, render_template, request, url_for
+from flask import Flask, flash, has_request_context, redirect, render_template, request, session, url_for
+from werkzeug.security import check_password_hash, generate_password_hash
 
 data_file = Path(__file__).with_name("expenses.json")
 budget_file = Path(__file__).with_name("budget.json")
 group_data_file = Path(__file__).with_name("group_data.json")
-categories = ("food", "travel", "shopping", "other")
+account_db_file = Path(__file__).with_name("accounts.sqlite3")
+user_data_dir = Path(__file__).with_name("user_data")
+categories = ("food", "travel", "shopping","movie","donation", "other")
 currency_symbol = "₹"
 app = Flask(__name__)
 app.secret_key = os.environ.get("FLASK_SECRET_KEY") or secrets.token_hex(32)
@@ -29,14 +35,237 @@ def format_paise_input(paise):
     return f"{paise // 100}.{paise % 100:02d}"
 
 
+def format_rupees(amount):
+    return f"{currency_symbol}{amount:,.2f}"
+
+
 app.jinja_env.filters["inr"] = format_inr
 app.jinja_env.filters["paise_input"] = format_paise_input
+app.jinja_env.filters["rupees"] = format_rupees
+
+
+def initialize_account_database():
+    account_db_file.parent.mkdir(parents=True, exist_ok=True)
+    with closing(sqlite3.connect(account_db_file)) as connection:
+        connection.execute(
+            """CREATE TABLE IF NOT EXISTS users (
+                id INTEGER PRIMARY KEY,
+                username TEXT NOT NULL COLLATE NOCASE UNIQUE,
+                password_hash TEXT NOT NULL,
+                recovery_hash TEXT
+            )"""
+        )
+        columns = {
+            row[1] for row in connection.execute("PRAGMA table_info(users)")
+        }
+        if "recovery_hash" not in columns:
+            connection.execute("ALTER TABLE users ADD COLUMN recovery_hash TEXT")
+        connection.commit()
+
+
+def user_data_file(path):
+    user_id = session.get("user_id") if has_request_context() else None
+    if user_id is None:
+        return path
+    account_dir = user_data_dir / str(user_id)
+    account_dir.mkdir(parents=True, exist_ok=True)
+    return account_dir / path.name
+
+
+def migrate_legacy_data(user_id):
+    account_dir = user_data_dir / str(user_id)
+    account_dir.mkdir(parents=True, exist_ok=True)
+    for path in (data_file, budget_file, group_data_file):
+        destination = account_dir / path.name
+        if path.exists() and not destination.exists():
+            shutil.copy2(path, destination)
+
+
+def normalize_recovery_code(value):
+    return re.sub(r"[^A-Z0-9]", "", value.upper())
+
+
+def create_recovery_code():
+    raw_code = secrets.token_hex(16).upper()
+    return "-".join(raw_code[index:index + 4] for index in range(0, len(raw_code), 4))
+
+
+@app.before_request
+def require_account():
+    initialize_account_database()
+    if request.endpoint in ("login", "register", "forgot_password", "static"):
+        return
+    user_id = session.get("user_id")
+    if user_id is None:
+        return redirect(url_for("login"))
+    with closing(sqlite3.connect(account_db_file)) as connection:
+        account = connection.execute(
+            "SELECT username FROM users WHERE id = ?", (user_id,)
+        ).fetchone()
+    if account is None:
+        session.clear()
+        return redirect(url_for("login"))
+    session["username"] = account[0]
+
+
+@app.route("/register", methods=["GET", "POST"])
+def register():
+    if request.method == "GET":
+        return render_template("auth.html", mode="register")
+
+    username = request.form.get("username", "").strip()
+    password = request.form.get("password", "")
+    confirmation = request.form.get("confirm_password", "")
+    if not re.fullmatch(r"[A-Za-z0-9_.-]{3,32}", username):
+        flash("Choose a username with 3 to 32 letters, numbers, dots, dashes, or underscores.", "error")
+        return render_template("auth.html", mode="register", username=username)
+    if len(password) < 8 or len(password) > 1024:
+        flash("Choose a password with at least 8 characters.", "error")
+        return render_template("auth.html", mode="register", username=username)
+    if password != confirmation:
+        flash("The passwords do not match.", "error")
+        return render_template("auth.html", mode="register", username=username)
+
+    recovery_code = create_recovery_code()
+    with closing(sqlite3.connect(account_db_file)) as connection:
+        connection.execute("BEGIN IMMEDIATE")
+        first_account = connection.execute("SELECT COUNT(*) FROM users").fetchone()[0] == 0
+        try:
+            cursor = connection.execute(
+                "INSERT INTO users (username, password_hash, recovery_hash) VALUES (?, ?, ?)",
+                (
+                    username,
+                    generate_password_hash(password),
+                    generate_password_hash(normalize_recovery_code(recovery_code)),
+                ),
+            )
+            user_id = cursor.lastrowid
+        except sqlite3.IntegrityError:
+            flash("That username is already in use.", "error")
+            return render_template("auth.html", mode="register", username=username)
+        connection.commit()
+
+    if first_account:
+        migrate_legacy_data(user_id)
+    session.clear()
+    session["user_id"] = user_id
+    session["username"] = username
+    return render_template(
+        "auth.html", mode="recovery-code", recovery_code=recovery_code, logged_in=True
+    )
+
+
+@app.route("/login", methods=["GET", "POST"])
+def login():
+    if request.method == "GET":
+        return render_template("auth.html", mode="login")
+
+    username = request.form.get("username", "").strip()
+    password = request.form.get("password", "")
+    with closing(sqlite3.connect(account_db_file)) as connection:
+        account = connection.execute(
+            "SELECT id, username, password_hash FROM users WHERE username = ?",
+            (username,),
+        ).fetchone()
+    if account is None or not check_password_hash(account[2], password):
+        flash("Username or password is incorrect.", "error")
+        return render_template("auth.html", mode="login", username=username)
+
+    session.clear()
+    session["user_id"] = account[0]
+    session["username"] = account[1]
+    return redirect(url_for("dashboard"))
+
+
+@app.route("/forgot-password", methods=["GET", "POST"])
+def forgot_password():
+    if request.method == "GET":
+        return render_template("auth.html", mode="forgot-password")
+
+    username = request.form.get("username", "").strip()
+    recovery_code = normalize_recovery_code(
+        request.form.get("recovery_code", "").strip()
+    )
+    password = request.form.get("password", "")
+    confirmation = request.form.get("confirm_password", "")
+    if len(password) < 8 or len(password) > 1024:
+        flash("Choose a new password with at least 8 characters.", "error")
+        return render_template("auth.html", mode="forgot-password", username=username)
+    if password != confirmation:
+        flash("The passwords do not match.", "error")
+        return render_template("auth.html", mode="forgot-password", username=username)
+
+    with closing(sqlite3.connect(account_db_file)) as connection:
+        connection.execute("BEGIN IMMEDIATE")
+        account = connection.execute(
+            "SELECT id, recovery_hash FROM users WHERE username = ?", (username,)
+        ).fetchone()
+        if (
+            account is None
+            or not account[1]
+            or not recovery_code
+            or not check_password_hash(account[1], recovery_code)
+        ):
+            flash("Username or recovery code is incorrect.", "error")
+            return render_template(
+                "auth.html", mode="forgot-password", username=username
+            )
+
+        new_recovery_code = create_recovery_code()
+        connection.execute(
+            "UPDATE users SET password_hash = ?, recovery_hash = ? WHERE id = ?",
+            (
+                generate_password_hash(password),
+                generate_password_hash(normalize_recovery_code(new_recovery_code)),
+                account[0],
+            ),
+        )
+        connection.commit()
+
+    return render_template(
+        "auth.html", mode="recovery-code", recovery_code=new_recovery_code
+    )
+
+
+@app.route("/recovery-code", methods=["GET", "POST"])
+def recovery_code_settings():
+    user_id = session["user_id"]
+    username = session["username"]
+    if request.method == "POST":
+        current_password = request.form.get("current_password", "")
+        with closing(sqlite3.connect(account_db_file)) as connection:
+            account = connection.execute(
+                "SELECT password_hash FROM users WHERE id = ?", (user_id,)
+            ).fetchone()
+            if account is None or not check_password_hash(account[0], current_password):
+                flash("Your current password is incorrect.", "error")
+                return render_template("recovery_code.html", username=username)
+
+            recovery_code = create_recovery_code()
+            connection.execute(
+                "UPDATE users SET recovery_hash = ? WHERE id = ?",
+                (generate_password_hash(normalize_recovery_code(recovery_code)), user_id),
+            )
+            connection.commit()
+        return render_template(
+            "recovery_code.html", username=username, recovery_code=recovery_code
+        )
+
+    return render_template("recovery_code.html", username=username)
+
+
+@app.route("/logout", methods=["POST"])
+def logout():
+    session.clear()
+    flash("You have been signed out.", "success")
+    return redirect(url_for("login"))
 
 
 def load_expenses():
-    if not data_file.exists():
+    path = user_data_file(data_file)
+    if not path.exists():
         return []
-    with data_file.open("r", encoding="utf-8") as file:
+    with path.open("r", encoding="utf-8") as file:
         expenses = json.load(file)
 
     today = date.today().isoformat()
@@ -46,35 +275,34 @@ def load_expenses():
 
 
 def save_expenses(expenses):
-    with data_file.open("w", encoding="utf-8") as file:
+    with user_data_file(data_file).open("w", encoding="utf-8") as file:
         json.dump(expenses, file, indent=4)
 
 
 def load_monthly_budget():
-    if not budget_file.exists():
+    path = user_data_file(budget_file)
+    if not path.exists():
         return 0
-    with budget_file.open("r", encoding="utf-8") as file:
+    with path.open("r", encoding="utf-8") as file:
         return json.load(file)["monthly_budget"]
 
 
 def save_monthly_budget(amount):
-    with budget_file.open("w", encoding="utf-8") as file:
+    with user_data_file(budget_file).open("w", encoding="utf-8") as file:
         json.dump({"monthly_budget": amount}, file, indent=4)
 
 
 def load_groups():
-    if not group_data_file.exists():
+    path = user_data_file(group_data_file)
+    if not path.exists():
         return []
-    with group_data_file.open("r", encoding="utf-8") as file:
+    with path.open("r", encoding="utf-8") as file:
         groups = json.load(file)
-    for group in groups:
-        for member in group["members"]:
-            member.setdefault("email", "")
     return groups
 
 
 def save_groups(groups):
-    with group_data_file.open("w", encoding="utf-8") as file:
+    with user_data_file(group_data_file).open("w", encoding="utf-8") as file:
         json.dump(groups, file, indent=4, ensure_ascii=False)
 
 
@@ -149,7 +377,7 @@ def suggest_settlements(group, balances):
 
 def render_expense_form(title, heading, submit_label, action, values, index=None):
     return render_template(
-        "add_expense.html",
+        "edit_expense.html",
         title=title,
         heading=heading,
         submit_label=submit_label,
@@ -228,8 +456,8 @@ def render_group_detail(group):
         group=group,
         members=group["members"],
         member_names=member_names,
-        email_share_links={
-            expense["id"]: expense_mailto_link(group, expense, member_names)
+        gmail_compose_links={
+            expense["id"]: expense_gmail_compose_link(group, expense, member_names)
             for expense in expenses
         },
         balances=balances,
@@ -237,30 +465,16 @@ def render_group_detail(group):
         expenses=expenses,
         settlements=settlements,
         today=date.today().isoformat(),
+        current_month_label=date.today().strftime("%B %Y"),
     )
 
 
-def valid_iso_date(value):
-    try:
-        parsed_date = date.fromisoformat(value)
-    except ValueError:
-        return False
-    return parsed_date.isoformat() == value
-
-
-def valid_email(value):
-    return not value or re.fullmatch(r"[^@\s]+@[^@\s]+\.[^@\s]+", value) is not None
-
-
-def expense_mailto_link(group, expense, member_names):
-    member_emails = {
-        member["id"]: member.get("email", "")
-        for member in group["members"]
-    }
+def expense_gmail_compose_link(group, expense, member_names):
+    members = {member["id"]: member for member in group["members"]}
     recipients = [
-        member_emails[member_id]
+        members[member_id].get("email", "").strip()
         for member_id in expense["shares"]
-        if member_emails.get(member_id)
+        if members[member_id].get("email", "").strip()
     ]
     split_details = "\n".join(
         f"- {member_names[member_id]}: {format_inr(amount)}"
@@ -278,21 +492,35 @@ def expense_mailto_link(group, expense, member_names):
             split_details,
         ]
     )
-    recipient_path = quote(",".join(recipients), safe="@,+._-")
-    return (
-        f"mailto:{recipient_path}?"
-        + urlencode(
-            {
-                "subject": f"{group['name']} expense: {expense['description']}",
-                "body": body,
-            }
-        )
+    query = urlencode(
+        {
+            "view": "cm",
+            "fs": "1",
+            "to": ",".join(recipients),
+            "su": f"{group['name']} expense: {expense['description']}",
+            "body": body,
+        },
+        quote_via=quote,
     )
+    return f"https://mail.google.com/mail/?{query}"
+
+
+def valid_iso_date(value):
+    try:
+        parsed_date = date.fromisoformat(value)
+    except ValueError:
+        return False
+    return parsed_date.isoformat() == value
+
+
+def valid_email(value):
+    return re.fullmatch(r"[^@\s]+@[^@\s]+\.[^@\s]+", value) is not None
 
 
 @app.route("/")
 def dashboard():
-    current_month = date.today().strftime("%Y-%m")
+    today = date.today()
+    current_month = today.strftime("%Y-%m")
     expenses = [
         (index, expense)
         for index, expense in enumerate(load_expenses())
@@ -307,7 +535,9 @@ def dashboard():
     monthly_budget = load_monthly_budget()
     recent_expenses = sorted(
         expenses, key=lambda entry: (entry[1]["date"], entry[0]), reverse=True
-    )[:5]
+    )[:6]
+    budget_utilization = total / monthly_budget * 100 if monthly_budget else 0
+    top_category = max(totals_by_category, key=totals_by_category.get) if total else None
     return render_template(
         "dashboard.html",
         total=total,
@@ -316,6 +546,13 @@ def dashboard():
         chart_max=max(totals_by_category.values(), default=0),
         recent_expenses=recent_expenses,
         current_month=current_month,
+        current_month_label=today.strftime("%B %Y"),
+        today=today.isoformat(),
+        categories=categories,
+        daily_average=total / today.day,
+        budget_utilization=budget_utilization,
+        budget_utilization_bar=min(budget_utilization, 100),
+        top_category=top_category,
         monthly_budget=monthly_budget,
         remaining_budget=monthly_budget - total,
     )
@@ -323,30 +560,18 @@ def dashboard():
 
 @app.route("/add", methods=["GET", "POST"])
 def add_expense():
-    if request.method == "POST":
-        expense = validate_expense_form()
-        if expense is None:
-            return render_expense_form(
-                "Add expense | Expense Tracker",
-                "Add an expense",
-                "Save expense",
-                url_for("add_expense"),
-                request.form,
-            )
+    if request.method == "GET":
+        return redirect(url_for("dashboard") + "#quick-add")
 
-        expenses = load_expenses()
-        expenses.append(expense)
-        save_expenses(expenses)
-        flash("Expense added successfully.", "success")
-        return redirect(url_for("history"))
+    expense = validate_expense_form()
+    if expense is None:
+        return redirect(url_for("dashboard") + "#quick-add")
 
-    return render_expense_form(
-        "Add expense | Expense Tracker",
-        "Add an expense",
-        "Save expense",
-        url_for("add_expense"),
-        {"category": "", "amount": "", "date": date.today().isoformat()},
-    )
+    expenses = load_expenses()
+    expenses.append(expense)
+    save_expenses(expenses)
+    flash("Expense added successfully.", "success")
+    return redirect(url_for("history"))
 
 
 @app.route("/edit/<int:index>", methods=["GET", "POST"])
@@ -418,9 +643,10 @@ def history():
             flash("Choose a valid month filter.", "error")
             return redirect(url_for("history"))
 
+    all_expenses = load_expenses()
     expenses = [
         (index, expense)
-        for index, expense in enumerate(load_expenses())
+        for index, expense in enumerate(all_expenses)
         if (not selected_category or expense["category"] == selected_category)
         and (not selected_month or expense["date"].startswith(selected_month))
     ]
@@ -430,9 +656,13 @@ def history():
             expenses, key=lambda entry: (entry[1]["date"], entry[0]), reverse=True
         ),
         total=sum(expense["amount"] for _, expense in expenses),
+        expense_count=len(expenses),
+        total_logged_spend=sum(expense["amount"] for expense in all_expenses),
+        total_logged_count=len(all_expenses),
         categories=categories,
         selected_category=selected_category,
         selected_month=selected_month,
+        current_month_label=date.today().strftime("%B %Y"),
     )
 
 
@@ -457,18 +687,23 @@ def groups():
         creator_email = request.form.get("creator_email", "").strip()
         if not name or len(name) > 80 or not creator or len(creator) > 60:
             flash("Enter a group name (up to 80 characters) and your name (up to 60).", "error")
-            return render_template("groups.html", groups=load_groups())
-        if len(creator_email) > 254 or not valid_email(creator_email):
+            return render_template(
+                "groups.html",
+                groups=load_groups(),
+                current_month_label=date.today().strftime("%B %Y"),
+            )
+        if creator_email and (len(creator_email) > 254 or not valid_email(creator_email)):
             flash("Enter a valid email address, or leave it blank.", "error")
-            return render_template("groups.html", groups=load_groups())
-
+            return render_template(
+                "groups.html",
+                groups=load_groups(),
+                current_month_label=date.today().strftime("%B %Y"),
+            )
         group = {
             "id": uuid4().hex,
             "name": name,
             "currency": currency_symbol,
-            "members": [
-                {"id": uuid4().hex, "name": creator, "email": creator_email}
-            ],
+            "members": [{"id": uuid4().hex, "name": creator, "email": creator_email}],
             "expenses": [],
             "settlements": [],
         }
@@ -478,7 +713,11 @@ def groups():
         flash("Group created. Add your friends and family as members.", "success")
         return redirect(url_for("group_detail", group_id=group["id"]))
 
-    return render_template("groups.html", groups=load_groups())
+    return render_template(
+        "groups.html",
+        groups=load_groups(),
+        current_month_label=date.today().strftime("%B %Y"),
+    )
 
 
 @app.route("/groups/<group_id>")
@@ -502,14 +741,12 @@ def add_group_member(group_id):
     email = request.form.get("email", "").strip()
     if not name or len(name) > 60:
         flash("Enter a member name up to 60 characters.", "error")
-    elif len(email) > 254 or not valid_email(email):
+    elif email and (len(email) > 254 or not valid_email(email)):
         flash("Enter a valid email address, or leave it blank.", "error")
     elif any(member["name"].casefold() == name.casefold() for member in group["members"]):
         flash("That person is already in this group.", "error")
     else:
-        group["members"].append(
-            {"id": uuid4().hex, "name": name, "email": email}
-        )
+        group["members"].append({"id": uuid4().hex, "name": name, "email": email})
         save_groups(all_groups)
         flash(f"{name} added to the group.", "success")
     return redirect(url_for("group_detail", group_id=group_id))
@@ -523,16 +760,13 @@ def update_group_member_email(group_id, member_id):
         flash("That group could not be found.", "error")
         return redirect(url_for("groups"))
 
-    member = next(
-        (item for item in group["members"] if item["id"] == member_id),
-        None,
-    )
+    member = next((item for item in group["members"] if item["id"] == member_id), None)
     if member is None:
         flash("That group member could not be found.", "error")
         return redirect(url_for("group_detail", group_id=group_id))
 
     email = request.form.get("email", "").strip()
-    if len(email) > 254 or not valid_email(email):
+    if email and (len(email) > 254 or not valid_email(email)):
         flash("Enter a valid email address, or leave it blank.", "error")
     else:
         member["email"] = email

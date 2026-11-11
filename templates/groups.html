@@ -1,40 +1,95 @@
 {% extends "base.html" %}
-{% block title %}Shared groups | Expense Tracker{% endblock %}
+{% block title %}Shared groups | SpendWise{% endblock %}
 {% block content %}
-    <section class="page-heading">
+    <section class="dashboard-heading expenses-heading">
         <div>
-            <p class="eyebrow">KEEP EVERYONE IN SYNC</p>
+            <p class="eyebrow">SHARE THE SPENDING</p>
             <h1>Shared groups</h1>
-            <p class="muted">Split group expenses and keep track of who owes whom on this device.</p>
+            <p class="muted">Split expenses with friends, housemates, or travel buddies and track balances locally.</p>
         </div>
+        <a class="button dashboard-add-button" href="#create-group"><span aria-hidden="true">＋</span> Create a group</a>
     </section>
 
-    <section class="card">
-        <h2>Create a group</h2>
-        <form class="expense-form group-create-form" method="post" action="{{ url_for('groups') }}">
-            <label for="group-name">Group name</label>
-            <input id="group-name" name="name" maxlength="80" placeholder="e.g. Weekend trip" required>
-            <label for="creator-name">Your name</label>
-            <input id="creator-name" name="creator" maxlength="60" placeholder="e.g. Alex" required>
-            <label for="creator-email">Your email (optional)</label>
-            <input id="creator-email" name="creator_email" type="email" maxlength="254" placeholder="alex@example.com">
-            <button class="button" type="submit">Create group</button>
-        </form>
+    {% set total_members = namespace(count=0) %}
+    {% for group in groups %}
+        {% set total_members.count = total_members.count + group.members|length %}
+    {% endfor %}
+    <section class="groups-overview" aria-label="Shared groups overview">
+        <article class="groups-overview-card">
+            <span class="groups-overview-icon" aria-hidden="true">♧</span>
+            <div>
+                <p class="groups-overview-label">Your groups</p>
+                <p class="groups-overview-value">{{ groups|length }}</p>
+            </div>
+        </article>
+        <article class="groups-overview-card">
+            <span class="groups-overview-icon groups-overview-icon-muted" aria-hidden="true">♙</span>
+            <div>
+                <p class="groups-overview-label">People sharing with you</p>
+                <p class="groups-overview-value">{{ total_members.count }}</p>
+            </div>
+        </article>
     </section>
 
-    <section class="card">
-        <h2>Your groups</h2>
+    <div class="groups-content-grid">
+      <section class="dashboard-panel groups-list-panel">
+        <div class="panel-heading">
+            <div>
+                <p class="eyebrow">YOUR LOCAL GROUPS</p>
+                <h2>Your groups</h2>
+            </div>
+            <span class="groups-count-badge">{{ groups|length }} total</span>
+        </div>
         {% if groups %}
-            <div class="group-grid">
+            <div class="groups-card-grid">
                 {% for group in groups %}
-                    <a class="group-card" href="{{ url_for('group_detail', group_id=group.id) }}">
+                    <a class="shared-group-card" href="{{ url_for('group_detail', group_id=group.id) }}">
+                        <div class="shared-group-card-top">
+                            <span class="shared-group-icon" aria-hidden="true">{{ group.name[0]|upper }}</span>
+                            <span class="shared-group-arrow" aria-hidden="true">→</span>
+                        </div>
                         <strong>{{ group.name }}</strong>
-                        <span class="muted">{{ group.members|length }} members · {{ group.expenses|length }} expenses</span>
+                        <span class="shared-group-meta">{{ group.members|length }} member{% if group.members|length != 1 %}s{% endif %} · {{ group.expenses|length }} expense{% if group.expenses|length != 1 %}s{% endif %}</span>
+                        <span class="shared-group-total">{{ group.expenses|sum(attribute='amount')|inr }}</span>
+                        <span class="shared-group-view">View group details <span aria-hidden="true">→</span></span>
                     </a>
                 {% endfor %}
             </div>
         {% else %}
-            <p class="muted">No groups yet. Create one to start sharing expenses.</p>
+            <div class="groups-empty-state">
+                <span aria-hidden="true">♧</span>
+                <h3>No shared groups yet</h3>
+                <p>Create your first group to split costs and track who owes what.</p>
+                <a class="panel-link" href="#create-group">Create your first group <span aria-hidden="true">→</span></a>
+            </div>
         {% endif %}
-    </section>
+      </section>
+
+      <section class="dashboard-panel group-create-panel" id="create-group">
+        <div class="panel-heading">
+            <div>
+                <p class="eyebrow">GET STARTED</p>
+                <h2>Create a group</h2>
+            </div>
+            <span class="panel-icon" aria-hidden="true">＋</span>
+        </div>
+        <p class="group-form-intro">Start a new group to track shared costs and settle up effortlessly.</p>
+        <form class="group-create-form" method="post" action="{{ url_for('groups') }}">
+            <div class="group-form-field">
+                <label for="group-name">Group name</label>
+                <input id="group-name" name="name" maxlength="80" placeholder="e.g. Weekend trip" required>
+            </div>
+            <div class="group-form-field">
+                <label for="creator-name">Your name</label>
+                <input id="creator-name" name="creator" maxlength="60" placeholder="e.g. Alex" required>
+            </div>
+            <div class="group-form-field">
+                <label for="creator-email">Your email <span>(optional)</span></label>
+                <input id="creator-email" name="creator_email" type="email" maxlength="254" placeholder="name@example.com">
+            </div>
+            <button class="button group-create-button" type="submit"><span aria-hidden="true">＋</span> Create group</button>
+        </form>
+        <p class="group-local-note"><span aria-hidden="true">✓</span> Groups are stored on this device. No account or cloud sync required.</p>
+      </section>
+    </div>
 {% endblock %}

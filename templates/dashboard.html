@@ -1,95 +1,164 @@
 {% extends "base.html" %}
-{% block title %}Dashboard | Expense Tracker{% endblock %}
+{% block title %}Dashboard | SpendWise{% endblock %}
 {% block content %}
-    <section class="page-heading">
+    <section class="dashboard-heading">
         <div>
-            <p class="eyebrow">YOUR MONEY, AT A GLANCE</p>
-            <h1>Dashboard</h1>
-            <p class="muted">A clear view of your recorded spending.</p>
+            <p class="eyebrow">FINANCIAL OPERATIONS</p>
+            <h1>Spending overview</h1>
+            <p class="muted">Your spending at a glance for {{ current_month_label }}.</p>
         </div>
-        <a class="button" href="{{ url_for('add_expense') }}">+ Add expense</a>
+        <a class="button dashboard-add-button" href="#quick-add"><span aria-hidden="true">＋</span> Add expense</a>
     </section>
 
-    <section class="summary-grid" aria-label="Spending summary">
-        <article class="card total-card">
-            <p class="muted">Spent in {{ current_month }}</p>
-            <p class="large-number">{{ "%.2f"|format(total) }}</p>
+    <section class="dashboard-metrics" aria-label="Monthly spending summary">
+        <article class="metric-card metric-card-primary">
+            <div class="metric-label"><span>Total month spending</span><span class="metric-icon" aria-hidden="true">₹</span></div>
+            <p class="metric-value">{{ total|rupees }}</p>
+            <p class="metric-caption">{{ expense_count }} expense{% if expense_count != 1 %}s{% endif %} recorded this month</p>
         </article>
-        <article class="card">
-            <p class="muted">Expenses this month</p>
-            <p class="large-number">{{ expense_count }}</p>
-        </article>
-    </section>
 
-    <section class="card budget-card">
-        <div class="section-heading">
-            <div>
-                <h2>Monthly budget</h2>
-                {% if monthly_budget > 0 %}
-                    <p class="muted budget-status {% if remaining_budget < 0 %}over-budget{% endif %}">
-                        {% if remaining_budget < 0 %}
-                            Over budget by {{ "%.2f"|format(-remaining_budget) }}
-                        {% else %}
-                            {{ "%.2f"|format(remaining_budget) }} remaining
-                        {% endif %}
-                    </p>
-                {% else %}
-                    <p class="muted budget-status">Set a budget to track your monthly spending.</p>
-                {% endif %}
-            </div>
+        <article class="metric-card">
+            <div class="metric-label"><span>Budget utilized</span><span class="metric-icon metric-icon-muted" aria-hidden="true">◴</span></div>
             {% if monthly_budget > 0 %}
-                <strong class="budget-amount">{{ "%.2f"|format(monthly_budget) }}</strong>
+                <p class="metric-value">{{ "%.1f"|format(budget_utilization) }}<span class="metric-suffix">%</span></p>
+                <div class="budget-progress" role="progressbar" aria-label="Monthly budget used" aria-valuemin="0" aria-valuemax="100" aria-valuenow="{{ budget_utilization_bar }}">
+                    <span style="width: {{ budget_utilization_bar }}%"></span>
+                </div>
+                <p class="metric-caption">of {{ monthly_budget|rupees }} monthly limit</p>
+            {% else %}
+                <p class="metric-value metric-value-empty">No budget set</p>
+                <p class="metric-caption">Add a monthly limit below.</p>
             {% endif %}
-        </div>
-        <form class="budget-form" method="post" action="{{ url_for('update_budget') }}">
-            <label for="monthly-budget">Monthly limit</label>
-            <input id="monthly-budget" name="monthly_budget" type="number" min="0" step="0.01"
-                   value="{{ '%.2f'|format(monthly_budget) if monthly_budget > 0 else '' }}"
-                   placeholder="Enter budget" required>
-            <button class="button" type="submit">Save budget</button>
-        </form>
+            <form class="metric-budget-form" method="post" action="{{ url_for('update_budget') }}">
+                <label class="visually-hidden" for="monthly-budget">Monthly budget</label>
+                <input id="monthly-budget" name="monthly_budget" type="number" min="0" step="0.01"
+                       value="{{ '%.2f'|format(monthly_budget) if monthly_budget > 0 else '' }}"
+                       placeholder="Monthly limit" required>
+                <button type="submit">Save</button>
+            </form>
+        </article>
+
+        <article class="metric-card">
+            <div class="metric-label"><span>Daily velocity</span><span class="metric-icon metric-icon-muted" aria-hidden="true">↗</span></div>
+            <p class="metric-value">{{ daily_average|rupees }}</p>
+            <p class="metric-caption">Average per day this month</p>
+        </article>
+
+        <article class="metric-card">
+            <div class="metric-label"><span>Remaining buffer</span><span class="metric-icon metric-icon-muted" aria-hidden="true">◉</span></div>
+            {% if monthly_budget > 0 %}
+                <p class="metric-value {% if remaining_budget < 0 %}metric-value-over{% else %}metric-value-positive{% endif %}">{{ remaining_budget|abs|rupees }}</p>
+                <p class="metric-caption">
+                    {% if remaining_budget < 0 %}
+                        Over budget by {{ "%.2f"|format(-remaining_budget) }}
+                    {% else %}
+                        Left in your monthly budget
+                    {% endif %}
+                </p>
+            {% else %}
+                <p class="metric-value metric-value-empty">—</p>
+                <p class="metric-caption">Set a budget to track your buffer.</p>
+            {% endif %}
+        </article>
     </section>
 
-    <section class="card">
-        <h2>By category</h2>
-        <div class="category-grid">
-            {% for category, amount in totals_by_category.items() %}
-                <div class="category-item">
-                    <span>{{ category|capitalize }}</span>
-                    <strong>{{ "%.2f"|format(amount) }}</strong>
-                </div>
-            {% endfor %}
-        </div>
-        <h3 class="chart-heading">Spending chart</h3>
-        <div class="category-chart" role="img" aria-label="Bar chart of spending by category this month">
-            {% for category, amount in totals_by_category.items() %}
-                <div class="chart-row">
-                    <span>{{ category|capitalize }}</span>
-                    <div class="chart-track">
-                        <div class="chart-bar" style="width: {{ (amount / chart_max * 100) if chart_max else 0 }}%"></div>
+    <section class="dashboard-content-grid">
+        <div class="dashboard-primary-column">
+            <article class="dashboard-panel quick-add-panel" id="quick-add">
+                <div class="panel-heading">
+                    <div>
+                        <p class="eyebrow">QUICK ENTRY</p>
+                        <h2>Add a new expense</h2>
                     </div>
-                    <strong>{{ "%.2f"|format(amount) }}</strong>
+                    <span class="panel-icon" aria-hidden="true">＋</span>
                 </div>
-            {% endfor %}
-        </div>
-    </section>
+                <form class="quick-expense-form" method="post" action="{{ url_for('add_expense') }}">
+                    <div class="quick-form-field">
+                        <label for="quick-category">Category</label>
+                        <select id="quick-category" name="category" required>
+                            <option value="" disabled selected>Choose a category</option>
+                            {% for category in categories %}
+                                <option value="{{ category }}">{{ category|capitalize }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="quick-form-field">
+                        <label for="quick-amount">Amount</label>
+                        <div class="amount-input-wrap">
+                            <span aria-hidden="true">₹</span>
+                            <input id="quick-amount" name="amount" type="number" min="0.01" step="0.01" placeholder="0.00" required>
+                        </div>
+                    </div>
+                    <div class="quick-form-field">
+                        <label for="quick-date">Date</label>
+                        <input id="quick-date" name="date" type="date" value="{{ today }}" required>
+                    </div>
+                    <button class="button quick-submit-button" type="submit">Add expense</button>
+                </form>
+            </article>
 
-    <section class="card">
-        <div class="section-heading">
-            <h2>Recent expenses</h2>
-            <a href="{{ url_for('history') }}">View all</a>
+            <article class="dashboard-panel category-panel">
+                <div class="panel-heading">
+                    <div>
+                        <p class="eyebrow">SPENDING MIX</p>
+                        <h2>By category</h2>
+                    </div>
+                    <a class="panel-link" href="{{ url_for('history') }}">View history <span aria-hidden="true">→</span></a>
+                </div>
+                {% if top_category %}
+                    <p class="top-category-note">Top cost driver: <strong>{{ top_category|capitalize }}</strong> · {{ totals_by_category[top_category]|rupees }}</p>
+                {% else %}
+                    <p class="top-category-note">Your category breakdown will appear as you add expenses.</p>
+                {% endif %}
+                <div class="category-breakdown">
+                    {% for category, amount in totals_by_category.items() %}
+                        <div class="category-breakdown-row">
+                            <div class="category-row-label">
+                                <span>{{ category|capitalize }}</span>
+                                <strong>{{ amount|rupees }}</strong>
+                            </div>
+                            <div class="category-progress" role="img" aria-label="{{ category|capitalize }}: {{ amount|rupees }}">
+                                <span class="category-progress-fill category-color-{{ loop.index }}" style="width: {{ (amount / total * 100) if total else 0 }}%"></span>
+                            </div>
+                        </div>
+                    {% endfor %}
+                </div>
+            </article>
         </div>
-        {% if recent_expenses %}
-            <ul class="expense-list">
-                {% for index, expense in recent_expenses %}
-                    <li>
-                        <span>{{ expense.date }} · {{ expense.category|capitalize }}</span>
-                        <span><strong>{{ "%.2f"|format(expense.amount) }}</strong> · <a href="{{ url_for('edit_expense', index=index) }}">Edit</a></span>
-                    </li>
-                {% endfor %}
-            </ul>
-        {% else %}
-            <p class="muted">No expenses yet. Add your first expense to get started.</p>
-        {% endif %}
+
+        <article class="dashboard-panel recent-panel">
+            <div class="panel-heading">
+                <div>
+                    <p class="eyebrow">LIVE LEDGER</p>
+                    <h2>Recent expenses</h2>
+                </div>
+                <a class="panel-link" href="{{ url_for('history') }}">View all <span aria-hidden="true">→</span></a>
+            </div>
+            <p class="recent-count">{{ expense_count }} recorded this month</p>
+            {% if recent_expenses %}
+                <div class="recent-expense-list">
+                    {% for index, expense in recent_expenses %}
+                        <div class="recent-expense-row">
+                            <span class="expense-category-mark category-mark-{{ expense.category }}" aria-hidden="true">{{ expense.category[0]|upper }}</span>
+                            <div class="expense-row-details">
+                                <strong>{{ expense.category|capitalize }}</strong>
+                                <span>{{ expense.date }}</span>
+                            </div>
+                            <div class="expense-row-amount">
+                                <strong>{{ expense.amount|rupees }}</strong>
+                                <a href="{{ url_for('edit_expense', index=index) }}">Edit</a>
+                            </div>
+                        </div>
+                    {% endfor %}
+                </div>
+            {% else %}
+                <div class="dashboard-empty-state">
+                    <span aria-hidden="true">▤</span>
+                    <p>No expenses yet this month.</p>
+                    <span>Add your first expense to see it here.</span>
+                </div>
+            {% endif %}
+            <a class="ledger-link" href="{{ url_for('history') }}">View all expenses <span aria-hidden="true">→</span></a>
+        </article>
     </section>
 {% endblock %}

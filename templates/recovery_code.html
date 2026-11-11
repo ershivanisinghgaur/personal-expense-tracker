@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% block title %}Recovery code | SpendWise{% endblock %}
+{% block content %}
+    <section class="recovery-settings">
+        <p class="eyebrow">ACCOUNT SECURITY</p>
+        <h1>Recovery code</h1>
+        <p class="muted">Generate a new one-time code for {{ username }}. Creating a new code replaces the previous one.</p>
+        {% if recovery_code %}
+            <p class="recovery-code-display" id="recovery-code">{{ recovery_code }}</p>
+            <p class="muted">Save this code somewhere private. It will not be shown again.</p>
+        {% endif %}
+        <form class="recovery-settings-form" method="post" action="{{ url_for('recovery_code_settings') }}">
+            <label for="current-password">Confirm your current password</label>
+            <input id="current-password" name="current_password" type="password" autocomplete="current-password" required>
+            <button class="button" type="submit">{{ 'Generate another code' if recovery_code else 'Generate recovery code' }}</button>
+        </form>
+    </section>
+{% endblock %}

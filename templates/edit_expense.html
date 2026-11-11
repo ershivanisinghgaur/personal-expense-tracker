@@ -5,7 +5,7 @@
         <div>
             <p class="eyebrow">KEEP TRACK</p>
             <h1>{{ heading }}</h1>
-            <p class="muted">Record when and where you spent.</p>
+            <p class="muted">Update the category, amount, or date for this expense.</p>
         </div>
     </section>
     <form class="card expense-form" method="post" action="{{ form_action }}">
@@ -24,8 +24,6 @@
         <input id="date" name="date" type="date" value="{{ values.get('date', '') }}" required>
 
         <button class="button" type="submit">{{ submit_label }}</button>
-        {% if index is not none %}
-            <a class="cancel-link" href="{{ url_for('history') }}">Cancel</a>
-        {% endif %}
+        <a class="cancel-link" href="{{ url_for('history') }}">Cancel</a>
     </form>
 {% endblock %}

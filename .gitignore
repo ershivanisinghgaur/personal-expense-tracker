@@ -1,6 +1,8 @@
 expenses.json
 budget.json
 group_data.json
+accounts.sqlite3
+user_data/
 __pycache__/
 *.py[cod]
 .venv/
